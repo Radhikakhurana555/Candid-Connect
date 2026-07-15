@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.streamlit/secrets.toml
+recruitment.db
+uploads/resumes/*
+!uploads/resumes/.gitkeep
+uploads/job_descriptions/*
+!uploads/job_descriptions/.gitkeep
+uploads/cas_reports/*
+!uploads/cas_reports/.gitkeep
