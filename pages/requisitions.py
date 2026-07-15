@@ -1,11 +1,15 @@
 from datetime import date
 
 import pandas as pd
+import hashlib
 import streamlit as st
 
 from services.repository import create_requisition, list_requisitions
 from utils.constants import BUSINESS_SEGMENTS
 
+def build_submission_key(*values) -> str:
+    combined = "|".join(str(value).strip().lower() for value in values)
+    return hashlib.sha256(combined.encode("utf-8")).hexdigest()
 st.title("Requisition Management")
 
 create_tab, list_tab = st.tabs(["Create Requisition", "View Requisitions"])
@@ -51,37 +55,53 @@ with create_tab:
             },
         )
         submitted = st.form_submit_button("Create Requisition", type="primary")
+if submitted:
+    total_weight = float(criteria_df["weight"].fillna(0).sum())
 
-    if submitted:
-        total_weight = float(criteria_df["weight"].fillna(0).sum())
-        if not job_title.strip():
-            st.error("Job title is required.")
-        elif round(total_weight, 2) != 100.0:
-            st.error(f"Scoring weights total {total_weight:g}. They must total 100.")
-        else:
-            req_id = create_requisition(
-                {
-                    "job_title": job_title,
-                    "business_segment": business_segment,
-                    "location": location,
-                    "hiring_manager": hiring_manager,
-                    "recruiter": recruiter,
-                    "experience_min": experience_min,
-                    "experience_max": experience_max,
-                    "mandatory_skills": mandatory_skills,
-                    "preferred_skills": preferred_skills,
-                    "target_companies": target_companies,
-                    "job_description": job_description,
-                    "application_link": application_link,
-                    "target_closure_date": target_closure_date.isoformat(),
-                },
-                criteria_df.fillna("").to_dict("records"),
-            )
-            st.success(f"Requisition {req_id} created successfully.")
+    submission_key = build_submission_key(
+        job_title,
+        business_segment,
+        location,
+        hiring_manager,
+        target_closure_date,
+    )
 
-with list_tab:
-    rows = list_requisitions()
-    if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    if not job_title.strip():
+        st.error("Job title is required.")
+
+    elif round(total_weight, 2) != 100.0:
+        st.error(
+            f"Scoring weights total {total_weight:g}. "
+            "They must total 100."
+        )
+
+    elif st.session_state.get("last_requisition_submission") == submission_key:
+        st.warning("This requisition has already been submitted.")
+
     else:
-        st.info("No requisitions created yet.")
+        st.session_state["last_requisition_submission"] = submission_key
+
+        req_id = create_requisition(
+            {
+                "job_title": job_title.strip(),
+                "business_segment": business_segment,
+                "location": location.strip(),
+                "hiring_manager": hiring_manager.strip(),
+                "recruiter": recruiter.strip(),
+                "experience_min": experience_min,
+                "experience_max": experience_max,
+                "mandatory_skills": mandatory_skills.strip(),
+                "preferred_skills": preferred_skills.strip(),
+                "target_companies": target_companies.strip(),
+                "job_description": job_description.strip(),
+                "application_link": application_link.strip(),
+                "target_closure_date": target_closure_date.isoformat(),
+            },
+            criteria_df.fillna("").to_dict("records"),
+        )
+
+        st.success(
+            f"Requisition {req_id} created successfully."
+        )
+
+        st.rerun()
