@@ -1,1 +1,0 @@
-"""Intellecap TA Copilot package."""
